@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { RatingScaleField } from './RatingScaleField';
 import {
@@ -64,6 +63,7 @@ const STEPS: Step[] = [
 
 export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyFormProps) {
   const [stepIndex, setStepIndex] = useState(0);
+  const directionRef = useRef<1 | -1>(1);
   const [ratings, setRatings] = useState<Record<string, number | null>>(() =>
     Object.fromEntries(SURVEY_RATING_CATEGORIES.map((category) => [category, null]))
   );
@@ -87,6 +87,7 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
     if (!canAdvance) return;
 
     if (!isLastStep) {
+      directionRef.current = 1;
       setStepIndex((i) => i + 1);
       return;
     }
@@ -107,70 +108,73 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
       onBack();
       return;
     }
+    directionRef.current = -1;
     setStepIndex((i) => i - 1);
   };
 
   return (
-    <Card padding="none">
-      <CardContent className="p-6 sm:p-8">
-        <div className="mb-6">
-          <ProgressBar
-            current={stepIndex + 1}
-            total={STEPS.length}
-            label={`Reviewing ${reviewee.name}`}
-          />
-        </div>
+    <div>
+      <div className="mb-8">
+        <ProgressBar
+          current={stepIndex + 1}
+          total={STEPS.length}
+          label={`Reviewing ${reviewee.name}`}
+        />
+      </div>
 
-        <div key={stepIndex} className="animate-step-in min-h-[280px] flex flex-col justify-center">
-          {step.kind === 'rating' ? (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  {step.category}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  How would you rate {reviewee.name} on this?
-                </p>
-              </div>
-              <RatingScaleField
-                category={step.category}
-                value={ratings[step.category]}
-                onChange={(score) =>
-                  setRatings((current) => ({ ...current, [step.category]: score }))
-                }
-              />
+      <div
+        key={stepIndex}
+        className="animate-step-in min-h-[300px] flex flex-col justify-center"
+        style={{ '--step-offset': `${directionRef.current * 16}px` } as React.CSSProperties}
+      >
+        {step.kind === 'rating' ? (
+          <div className="space-y-7">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                {step.category}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
+                How would you rate {reviewee.name} on this?
+              </p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{step.title}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{step.helper}</p>
-              </div>
-              <textarea
-                autoFocus
-                value={text[step.field]}
-                onChange={(event) =>
-                  setText((current) => ({ ...current, [step.field]: event.target.value }))
-                }
-                rows={5}
-                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors"
-                placeholder={step.placeholder}
-              />
+            <RatingScaleField
+              category={step.category}
+              value={ratings[step.category]}
+              onChange={(score) =>
+                setRatings((current) => ({ ...current, [step.category]: score }))
+              }
+            />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{step.title}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">{step.helper}</p>
             </div>
-          )}
-        </div>
+            <textarea
+              autoFocus
+              value={text[step.field]}
+              onChange={(event) =>
+                setText((current) => ({ ...current, [step.field]: event.target.value }))
+              }
+              rows={5}
+              className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-colors"
+              placeholder={step.placeholder}
+            />
+          </div>
+        )}
+      </div>
 
-        <div className="flex items-center justify-between gap-3 mt-8 pt-6 border-t border-gray-100 dark:border-gray-800">
-          <Button type="button" variant="ghost" onClick={goBack} disabled={isSubmitting}>
-            <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
-            Back
-          </Button>
-          <Button type="button" onClick={goNext} disabled={!canAdvance} loading={isSubmitting}>
-            {isLastStep ? 'Submit Review' : 'Next'}
-            {!isLastStep && <ArrowRightIcon className="h-4 w-4 ml-1.5" />}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="flex items-center justify-between gap-3 mt-10 pt-6 border-t border-gray-100 dark:border-gray-800">
+        <Button type="button" variant="ghost" onClick={goBack} disabled={isSubmitting}>
+          <ArrowLeftIcon className="h-4 w-4 mr-1.5" />
+          Back
+        </Button>
+        <Button type="button" onClick={goNext} disabled={!canAdvance} loading={isSubmitting}>
+          {isLastStep ? 'Submit Review' : 'Next'}
+          {!isLastStep && <ArrowRightIcon className="h-4 w-4 ml-1.5" />}
+        </Button>
+      </div>
+    </div>
   );
 }

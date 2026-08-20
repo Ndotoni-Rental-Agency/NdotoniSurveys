@@ -10,7 +10,6 @@ import { NotificationModal } from '@/components/ui/NotificationModal';
 import { RevieweePicker } from '@/components/surveys/RevieweePicker';
 import { SurveyForm } from '@/components/surveys/SurveyForm';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent } from '@/components/ui/Card';
 import {
   SurveyAssignment,
   TeamMemberOption,
@@ -155,7 +154,7 @@ export default function SurveyWorkflowPage() {
       </Link>
 
       {assignment && step !== 'form' && (
-        <div>
+        <div className="animate-fade-up">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{assignment.title}</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {getProgressLabel(assignment)}
@@ -170,22 +169,20 @@ export default function SurveyWorkflowPage() {
       )}
 
       {step === 'complete' && assignment && (
-        <Card padding="none">
-          <CardContent className="p-8 text-center space-y-4">
-            <CheckCircleIcon className="h-12 w-12 text-green-600 mx-auto" />
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Survey Complete
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
-                You have submitted all required reviews for {assignment.title}.
-              </p>
-            </div>
-            <Link href="/">
-              <Button>Return to Dashboard</Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="animate-pop-in text-center py-16 space-y-4">
+          <CheckCircleIcon className="h-14 w-14 text-green-600 mx-auto" />
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+              Survey Complete
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              You have submitted all required reviews for {assignment.title}.
+            </p>
+          </div>
+          <Link href="/">
+            <Button>Return to Dashboard</Button>
+          </Link>
+        </div>
       )}
 
       {step === 'picker' && assignment && (

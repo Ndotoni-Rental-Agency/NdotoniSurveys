@@ -2,7 +2,6 @@
 
 import { ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { TeamMemberOption } from '@/types/survey';
-import { Card, CardContent } from '@/components/ui/Card';
 
 interface RevieweePickerProps {
   members: TeamMemberOption[];
@@ -40,21 +39,19 @@ export function RevieweePicker({
 
   if (availableMembers.length === 0) {
     return (
-      <Card padding="none">
-        <CardContent className="p-8 text-center space-y-3">
-          <CheckCircleIcon className="h-10 w-10 text-green-600 mx-auto" />
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            You have completed reviews for all assigned team members.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="animate-fade-up text-center py-16">
+        <CheckCircleIcon className="h-10 w-10 text-green-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          You have completed reviews for all assigned team members.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+    <div className="space-y-6">
+      <div className="animate-fade-up">
+        <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
           Who would you like to review?
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -62,16 +59,17 @@ export function RevieweePicker({
         </p>
       </div>
 
-      <div className="grid gap-2.5">
-        {availableMembers.map((member) => (
+      <div className="divide-y divide-gray-100 dark:divide-gray-800">
+        {availableMembers.map((member, index) => (
           <button
             key={member.userId}
             type="button"
             onClick={() => onSelect(member)}
-            className="group flex items-center gap-4 text-left rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 hover:border-brand-300 dark:hover:border-brand-700 hover:shadow-soft transition-all"
+            className="group w-full flex items-center gap-4 text-left py-3.5 -mx-2 px-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors animate-fade-up"
+            style={{ animationDelay: `${index * 40}ms` }}
           >
             <div
-              className={`h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold ${avatarColor(member.name)}`}
+              className={`h-11 w-11 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold transition-transform group-hover:scale-105 ${avatarColor(member.name)}`}
             >
               {initials(member.name)}
             </div>
@@ -81,7 +79,7 @@ export function RevieweePicker({
                 <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{member.email}</p>
               )}
             </div>
-            <ChevronRightIcon className="h-5 w-5 text-gray-300 dark:text-gray-600 group-hover:text-brand-500 transition-colors shrink-0" />
+            <ChevronRightIcon className="h-5 w-5 text-gray-300 dark:text-gray-600 group-hover:text-brand-500 group-hover:translate-x-0.5 transition-all shrink-0" />
           </button>
         ))}
       </div>

@@ -1,16 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { StatCard } from '@/components/ui/StatCard';
+import { StatStrip } from '@/components/ui/StatStrip';
 import { SurveyAssignmentCard } from '@/components/surveys/SurveyAssignmentCard';
 import { useSurveys } from '@/hooks/useSurveys';
 import { SurveyAssignment } from '@/types/survey';
-import {
-  ClipboardDocumentCheckIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  CalendarDaysIcon,
-} from '@heroicons/react/24/outline';
 
 function groupAssignments(assignments: SurveyAssignment[]) {
   const now = new Date();
@@ -69,7 +63,7 @@ export default function SurveysDashboardPage() {
 
   return (
     <div className="space-y-10">
-      <div>
+      <div className="animate-fade-up">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Surveys</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
           Complete your assigned peer-review surveys for the team.
@@ -89,48 +83,30 @@ export default function SurveysDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard
-          title="Pending"
-          value={grouped.pending.length}
-          icon={<ClockIcon className="h-5 w-5 text-yellow-600" />}
-          iconBgColor="bg-yellow-100 dark:bg-yellow-900/20"
-        />
-        <StatCard
-          title="In Progress"
-          value={grouped.inProgress.length}
-          icon={<ClipboardDocumentCheckIcon className="h-5 w-5 text-blue-600" />}
-          iconBgColor="bg-blue-100 dark:bg-blue-900/20"
-        />
-        <StatCard
-          title="Completed"
-          value={grouped.completed.length}
-          icon={<CheckCircleIcon className="h-5 w-5 text-green-600" />}
-          iconBgColor="bg-green-100 dark:bg-green-900/20"
-        />
-        <StatCard
-          title="Future"
-          value={grouped.future.length}
-          icon={<CalendarDaysIcon className="h-5 w-5 text-gray-600" />}
-          iconBgColor="bg-gray-100 dark:bg-gray-800"
-        />
-      </div>
+      <StatStrip
+        items={[
+          { label: 'Pending', value: grouped.pending.length, accent: 'bg-yellow-500' },
+          { label: 'In Progress', value: grouped.inProgress.length, accent: 'bg-blue-500' },
+          { label: 'Completed', value: grouped.completed.length, accent: 'bg-green-500' },
+          { label: 'Future', value: grouped.future.length, accent: 'bg-gray-400' },
+        ]}
+      />
 
       {sections.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 p-10 text-center">
+        <div className="animate-fade-up text-center py-16">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No surveys assigned to you right now.
           </p>
         </div>
       ) : (
         sections.map((section) => (
-          <section key={section.title} className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          <section key={section.title} className="space-y-1">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
               {section.title}
             </h2>
-            <div className="grid gap-3">
-              {section.items.map((assignment) => (
-                <SurveyAssignmentCard key={assignment.assignmentId} assignment={assignment} />
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {section.items.map((assignment, index) => (
+                <SurveyAssignmentCard key={assignment.assignmentId} assignment={assignment} index={index} />
               ))}
             </div>
           </section>
