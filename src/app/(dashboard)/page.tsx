@@ -60,29 +60,36 @@ export default function SurveysDashboardPage() {
     );
   }
 
+  const sections = [
+    { title: 'Pending', items: grouped.pending },
+    { title: 'In Progress', items: grouped.inProgress },
+    { title: 'Completed', items: grouped.completed },
+    { title: 'Future / Not Yet Available', items: grouped.future },
+  ].filter((section) => section.items.length > 0);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Surveys</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Surveys</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
           Complete your assigned peer-review surveys for the team.
         </p>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 p-4 flex items-center justify-between gap-4">
+        <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-900/20 p-4 flex items-center justify-between gap-4">
           <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           <button
             type="button"
             onClick={loadData}
-            className="text-sm font-medium text-red-700 dark:text-red-300 hover:underline"
+            className="text-sm font-medium text-red-700 dark:text-red-300 hover:underline shrink-0"
           >
             Retry
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Pending"
           value={grouped.pending.length}
@@ -109,25 +116,26 @@ export default function SurveysDashboardPage() {
         />
       </div>
 
-      {[
-        { title: 'Pending Surveys', items: grouped.pending, empty: 'No pending surveys.' },
-        { title: 'In Progress', items: grouped.inProgress, empty: 'No surveys in progress.' },
-        { title: 'Completed', items: grouped.completed, empty: 'No completed surveys yet.' },
-        { title: 'Future / Not Yet Available', items: grouped.future, empty: 'No upcoming surveys scheduled.' },
-      ].map((section) => (
-        <section key={section.title} className="space-y-3">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{section.title}</h2>
-          {section.items.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400">{section.empty}</p>
-          ) : (
+      {sections.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-gray-200 dark:border-gray-700 p-10 text-center">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            No surveys assigned to you right now.
+          </p>
+        </div>
+      ) : (
+        sections.map((section) => (
+          <section key={section.title} className="space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {section.title}
+            </h2>
             <div className="grid gap-3">
               {section.items.map((assignment) => (
                 <SurveyAssignmentCard key={assignment.assignmentId} assignment={assignment} />
               ))}
             </div>
-          )}
-        </section>
-      ))}
+          </section>
+        ))
+      )}
     </div>
   );
 }

@@ -24,8 +24,8 @@ export function SurveyAssignmentCard({ assignment, actionLabel }: SurveyAssignme
       href={`/${assignment.assignmentId}`}
       className="block group"
     >
-      <Card className="hover:shadow-md hover:border-brand-300 dark:hover:border-brand-700 transition-all cursor-pointer">
-        <CardContent className="p-4">
+      <Card padding="none" className="hover:shadow-soft hover:border-brand-300 dark:hover:border-brand-700 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+        <CardContent className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">

@@ -16,7 +16,6 @@ import {
   TeamMemberOption,
   getProgressLabel,
 } from '@/types/survey';
-import { UserType } from '@/types/api';
 import { AuthBridge } from '@/lib/auth-bridge';
 import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
@@ -25,7 +24,7 @@ type WorkflowStep = 'loading' | 'picker' | 'form' | 'complete';
 export default function SurveyWorkflowPage() {
   const params = useParams<{ assignmentId: string }>();
   const assignmentId = params.assignmentId;
-  const { listUsers } = useTeamMembers();
+  const { getUsersByIds } = useTeamMembers();
   const { fetchMyAssignments, startAssignment, submitResponse } = useSurveys();
   const { notification, showSuccess, showError, closeNotification } = useNotification();
 
@@ -44,24 +43,16 @@ export default function SurveyWorkflowPage() {
   }, []);
 
   const eligibleMembers = useMemo(() => {
-    if (!assignment || !currentUserId) return teamMembers;
-
-    return teamMembers.filter(
-      (member) =>
-        member.userId !== currentUserId &&
-        assignment.requiredRevieweeIds.includes(member.userId)
-    );
-  }, [assignment, currentUserId, teamMembers]);
+    if (!currentUserId) return teamMembers;
+    return teamMembers.filter((member) => member.userId !== currentUserId);
+  }, [currentUserId, teamMembers]);
 
   const loadPage = async () => {
     try {
       setError(null);
       setStep('loading');
 
-      const [assignmentsResult, usersResult] = await Promise.all([
-        fetchMyAssignments(),
-        listUsers(UserType.ADMIN, 200),
-      ]);
+      const assignmentsResult = await fetchMyAssignments();
 
       const foundAssignment = assignmentsResult.assignments.find(
         (item) => item.assignmentId === assignmentId
@@ -78,14 +69,10 @@ export default function SurveyWorkflowPage() {
         activeAssignment = await startAssignment(foundAssignment.assignmentId);
       }
 
-      const admins = usersResult.users.map((entry) => ({
-        userId: entry.userId,
-        name: `${entry.profile?.firstName ?? ''} ${entry.profile?.lastName ?? ''}`.trim() || entry.userId,
-        email: entry.profile?.email ?? undefined,
-      }));
+      const reviewees = await getUsersByIds(activeAssignment.requiredRevieweeIds);
 
       setAssignment(activeAssignment);
-      setTeamMembers(admins);
+      setTeamMembers(reviewees);
 
       if (activeAssignment.status === 'COMPLETED') {
         setStep('complete');
@@ -158,33 +145,32 @@ export default function SurveyWorkflowPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div className="flex items-center gap-3">
-        <Link href="/">
-          <Button variant="outline" size="sm">
-            <ArrowLeftIcon className="h-4 w-4 mr-1" />
-            Back to Surveys
-          </Button>
-        </Link>
-      </div>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+      >
+        <ArrowLeftIcon className="h-4 w-4" />
+        Back to Surveys
+      </Link>
 
-      {assignment && (
+      {assignment && step !== 'form' && (
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{assignment.title}</h1>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{assignment.title}</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {getProgressLabel(assignment)}
           </p>
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 p-4">
+        <div className="rounded-2xl border border-red-200 bg-red-50 dark:bg-red-900/20 p-4">
           <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
 
       {step === 'complete' && assignment && (
-        <Card>
+        <Card padding="none">
           <CardContent className="p-8 text-center space-y-4">
             <CheckCircleIcon className="h-12 w-12 text-green-600 mx-auto" />
             <div>

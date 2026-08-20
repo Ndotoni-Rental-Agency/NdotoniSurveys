@@ -1,13 +1,14 @@
 /**
  * Authentication Bridge — trimmed down from the main ndotoni-web app.
- * Surveys is admin-only and has no self-serve sign-up or social login, so
- * only the Cognito email/password sign-in path is kept.
+ * Surveys is admin-only and has no self-serve sign-up, so only the Cognito
+ * email/password path and Google (via Hosted UI redirect) are kept.
  */
 
 import { GraphQLClient } from '@/lib/graphql-client';
 import {
   signIn as cognitoSignIn,
   signOut as cognitoSignOut,
+  signInWithRedirect,
   getCurrentUser,
   fetchAuthSession,
 } from 'aws-amplify/auth';
@@ -46,6 +47,31 @@ export class AuthBridge {
     }
 
     return { user: data.getMe };
+  }
+
+  /**
+   * Sign in with Google using the Cognito Hosted UI. Redirects the browser
+   * away — the result is picked up on return at /auth/callback.
+   */
+  static async signInWithGoogle() {
+    await signInWithRedirect({ provider: 'Google' });
+  }
+
+  /**
+   * Wait for Amplify to finish processing the OAuth redirect callback.
+   */
+  static async waitForOAuthSession(maxMs = 8000): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      try {
+        const session = await fetchAuthSession();
+        if (session.tokens?.accessToken) return true;
+      } catch {
+        // Amplify may still be exchanging the code
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    return false;
   }
 
   static async signOutFromBridge() {

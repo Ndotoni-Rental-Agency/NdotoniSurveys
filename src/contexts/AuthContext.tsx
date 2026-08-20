@@ -1,6 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+// Must run before any aws-amplify/auth call — AuthProvider is mounted at the
+// app root, so importing it here guarantees Amplify.configure() has run
+// before AuthBridge ever touches Cognito.
+import '@/lib/amplify';
 import { AuthBridge } from '@/lib/auth-bridge';
 import { deleteCookie, setCookie } from '@/lib/utils/cookies';
 import { AdminProfile } from '@/types/api';
@@ -11,7 +15,9 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const restoreSession = async () => {
+  const refreshUser = async () => {
     try {
       const hasSession = await AuthBridge.hasCognitoSession();
       if (!hasSession) {
@@ -56,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    restoreSession();
+    refreshUser();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -70,6 +76,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setCookie('accessToken', 'COGNITO_MANAGED');
     setUser(profile);
+  };
+
+  const signInWithGoogle = async () => {
+    setError(null);
+    await AuthBridge.signInWithGoogle();
   };
 
   const signOut = async () => {
@@ -86,7 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         signIn,
+        signInWithGoogle,
         signOut,
+        refreshUser,
       }}
     >
       {children}

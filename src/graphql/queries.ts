@@ -34,3 +34,40 @@ export const listAllUsers = /* GraphQL */ `query ListAllUsers($limit: Int, $next
     __typename
   }
 }`;
+
+// Reviewees on a survey assignment aren't necessarily ADMIN type (the team
+// can include agents etc.), so unlike listAllUsers this needs to resolve
+// name/email across every UserProfile variant, not just Admin.
+export const getUserById = /* GraphQL */ `query GetUserById($userId: ID!) {
+  getUserById(userId: $userId) {
+    ... on Admin {
+      email
+      firstName
+      lastName
+      userType
+      __typename
+    }
+    ... on Agent {
+      email
+      firstName
+      lastName
+      userType
+      __typename
+    }
+    ... on Landlord {
+      email
+      firstName
+      lastName
+      userType
+      __typename
+    }
+    ... on Tenant {
+      email
+      firstName
+      lastName
+      userType
+      __typename
+    }
+    __typename
+  }
+}`;
