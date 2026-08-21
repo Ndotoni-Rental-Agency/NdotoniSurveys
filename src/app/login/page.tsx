@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSafeErrorMessage } from '@/lib/error-utils';
+import { Card } from '@/components/ui/Card';
 
 export default function LoginPage() {
   const { signIn, signInWithGoogle, isAuthenticated } = useAuth();
@@ -56,7 +57,11 @@ export default function LoginPage() {
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Admin sign in</p>
         </div>
 
-        <div className="space-y-6 animate-fade-up" style={{ animationDelay: '100ms' }}>
+        <Card
+          padding="lg"
+          className="space-y-6 animate-fade-up"
+          style={{ animationDelay: '100ms' }}
+        >
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -77,7 +82,7 @@ export default function LoginPage() {
               <div className="w-full border-t border-gray-200 dark:border-gray-700" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-3 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">Or continue with email</span>
+              <span className="px-3 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with email</span>
             </div>
           </div>
 
@@ -141,7 +146,7 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-        </div>
+        </Card>
       </div>
     </div>
   );

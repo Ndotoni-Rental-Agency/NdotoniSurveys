@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
 import { useSurveys } from '@/hooks/useSurveys';
 import { useNotification } from '@/hooks/useNotification';
@@ -23,6 +23,8 @@ type WorkflowStep = 'loading' | 'picker' | 'form' | 'complete';
 export default function SurveyWorkflowPage() {
   const params = useParams<{ assignmentId: string }>();
   const assignmentId = params.assignmentId;
+  const searchParams = useSearchParams();
+  const preselectedRevieweeId = searchParams.get('reviewee');
   const { getUsersByIds } = useTeamMembers();
   const { fetchMyAssignments, startAssignment, submitResponse } = useSurveys();
   const { notification, showSuccess, showError, closeNotification } = useNotification();
@@ -75,6 +77,22 @@ export default function SurveyWorkflowPage() {
 
       if (activeAssignment.status === 'COMPLETED') {
         setStep('complete');
+        return;
+      }
+
+      // Deep link from the dashboard's inline reviewee list — skip the
+      // picker and jump straight into that person's survey.
+      const preselected = preselectedRevieweeId
+        ? reviewees.find(
+            (member) =>
+              member.userId === preselectedRevieweeId &&
+              !activeAssignment.completedRevieweeIds.includes(member.userId)
+          )
+        : undefined;
+
+      if (preselected) {
+        setSelectedReviewee(preselected);
+        setStep('form');
       } else {
         setStep('picker');
       }
