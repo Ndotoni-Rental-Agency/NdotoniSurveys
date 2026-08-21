@@ -1,52 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import {
-  CheckCircleIcon,
-  ClockIcon,
-  ChevronRightIcon,
-} from '@heroicons/react/24/outline';
-import { Card } from '@/components/ui/Card';
+import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { SurveyTable, ReviewRow, reviewRowRank } from '@/components/surveys/SurveyTable';
+import { AssignmentSummaryItem } from '@/components/surveys/AssignmentSummaryItem';
 import { useSurveys } from '@/hooks/useSurveys';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
 import { AuthBridge } from '@/lib/auth-bridge';
 import { SurveyAssignment, TeamMemberOption, formatDueDate } from '@/types/survey';
 
-const AVATAR_COLORS = [
-  'bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-300',
-  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-  'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-];
+const DUE_SOON_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  return (parts[0]?.[0] ?? '').concat(parts[1]?.[0] ?? '').toUpperCase() || '?';
-}
+type ReviewGroup = { assignment: SurveyAssignment; rows: ReviewRow[] };
+type AssignmentItem = { assignment: SurveyAssignment; status: 'FUTURE' | 'COMPLETED' };
+type Bucket = { reviewGroups: ReviewGroup[]; assignmentItems: AssignmentItem[] };
 
-function avatarColor(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i)) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[hash];
-}
-
-// One row per reviewee to review (or already reviewed) for an active
-// assignment, plus one summary row for assignments with nothing to act on
-// (not yet open, or every reviewee already done).
-type Row =
-  | { kind: 'review'; key: string; assignment: SurveyAssignment; reviewee: TeamMemberOption; done: boolean }
-  | { kind: 'assignment'; key: string; assignment: SurveyAssignment; status: 'FUTURE' | 'COMPLETED' };
-
-function rowRank(row: Row) {
-  if (row.kind === 'review') return row.done ? 2 : 0;
-  return row.status === 'FUTURE' ? 1 : 3;
+function isEmptyBucket(bucket: Bucket) {
+  return bucket.reviewGroups.length === 0 && bucket.assignmentItems.length === 0;
 }
 
 export default function SurveysDashboardPage() {
-  const router = useRouter();
   const { fetchMyAssignments } = useSurveys();
   const { getUsersByIds } = useTeamMembers();
   const [assignments, setAssignments] = useState<SurveyAssignment[]>([]);
@@ -54,6 +27,7 @@ export default function SurveysDashboardPage() {
   const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPast, setShowPast] = useState(false);
 
   useEffect(() => {
     AuthBridge.getUserId().then(setCurrentUserId);
@@ -90,18 +64,27 @@ export default function SurveysDashboardPage() {
     loadData();
   }, []);
 
-  const rows = useMemo<Row[]>(() => {
+  const { soon, later, past } = useMemo(() => {
     const now = new Date();
     const currentCycle = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const result: Row[] = [];
+    const soonCutoff = now.getTime() + DUE_SOON_WINDOW_MS;
+
+    const soonBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
+    const laterBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
+    const pastBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
+
+    const bucketFor = (assignment: SurveyAssignment, isCompleted: boolean) => {
+      if (isCompleted) return pastBucket;
+      const due = new Date(assignment.dueDate ?? '').getTime();
+      return !Number.isNaN(due) && due <= soonCutoff ? soonBucket : laterBucket;
+    };
 
     for (const assignment of assignments) {
       const isFuture = assignment.status !== 'COMPLETED' && assignment.cycleMonth > currentCycle;
+      const isCompleted = assignment.status === 'COMPLETED';
 
-      if (assignment.status === 'COMPLETED' || isFuture) {
-        result.push({
-          kind: 'assignment',
-          key: assignment.assignmentId,
+      if (isCompleted || isFuture) {
+        bucketFor(assignment, isCompleted).assignmentItems.push({
           assignment,
           status: isFuture ? 'FUTURE' : 'COMPLETED',
         });
@@ -111,18 +94,21 @@ export default function SurveysDashboardPage() {
       const reviewees = (revieweesByAssignment[assignment.assignmentId] ?? []).filter(
         (member) => member.userId !== currentUserId
       );
-      for (const reviewee of reviewees) {
-        result.push({
-          kind: 'review',
+      if (reviewees.length === 0) continue;
+
+      const rows: ReviewRow[] = reviewees
+        .map((reviewee) => ({
           key: `${assignment.assignmentId}:${reviewee.userId}`,
           assignment,
           reviewee,
           done: assignment.completedRevieweeIds.includes(reviewee.userId),
-        });
-      }
+        }))
+        .sort((a, b) => reviewRowRank(a) - reviewRowRank(b));
+
+      bucketFor(assignment, false).reviewGroups.push({ assignment, rows });
     }
 
-    return result.sort((a, b) => rowRank(a) - rowRank(b));
+    return { soon: soonBucket, later: laterBucket, past: pastBucket };
   }, [assignments, revieweesByAssignment, currentUserId]);
 
   if (loading) {
@@ -133,8 +119,10 @@ export default function SurveysDashboardPage() {
     );
   }
 
+  const isEmpty = isEmptyBucket(soon) && isEmptyBucket(later) && isEmptyBucket(past);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 max-w-3xl mx-auto">
       <div className="animate-fade-up">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Surveys</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
@@ -155,139 +143,74 @@ export default function SurveysDashboardPage() {
         </div>
       )}
 
-      {rows.length === 0 ? (
+      {isEmpty ? (
         <div className="animate-fade-up text-center py-16">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             No surveys assigned to you right now.
           </p>
         </div>
       ) : (
-        <Card padding="none" className="overflow-hidden animate-fade-up">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 dark:border-gray-800 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                <th className="py-3.5 pl-5 pr-3 font-semibold">Reviewee</th>
-                <th className="py-3.5 px-3 font-semibold hidden sm:table-cell">Survey</th>
-                <th className="py-3.5 px-3 font-semibold hidden md:table-cell">Due</th>
-                <th className="py-3.5 px-3 font-semibold">Status</th>
-                <th className="py-3.5 pl-3 pr-5 font-semibold text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {rows.map((row, index) => {
-                if (row.kind === 'assignment') {
-                  const isCompleted = row.status === 'COMPLETED';
-                  const href = `/${row.assignment.assignmentId}`;
+        <>
+          {!isEmptyBucket(soon) && (
+            <TimeSection title="Due soon" bucket={soon} />
+          )}
 
-                  return (
-                    <tr
-                      key={row.key}
-                      onClick={() => router.push(href)}
-                      className="animate-fade-up cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
-                      style={{ animationDelay: `${index * 30}ms` }}
-                    >
-                      <td className="py-3.5 pl-5 pr-3" colSpan={2}>
-                        <div className="flex items-center gap-3">
-                          <div className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center ${
-                            isCompleted ? 'bg-green-50 dark:bg-green-900/20' : 'bg-gray-100 dark:bg-gray-800'
-                          }`}>
-                            {isCompleted ? (
-                              <CheckCircleIcon className="h-5 w-5 text-green-600" />
-                            ) : (
-                              <ClockIcon className="h-5 w-5 text-gray-400" />
-                            )}
-                          </div>
-                          <p className="font-medium text-gray-900 dark:text-white truncate">{row.assignment.title}</p>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400">
-                        {formatDueDate(row.assignment.dueDate)}
-                      </td>
-                      <td className="py-3.5 px-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${
-                          isCompleted
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                        }`}>
-                          {isCompleted ? 'Completed' : 'Not yet available'}
-                        </span>
-                      </td>
-                      <td className="py-3.5 pl-3 pr-5 text-right">
-                        <Link
-                          href={href}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 group"
-                        >
-                          View
-                          <ChevronRightIcon className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                }
+          {!isEmptyBucket(later) && (
+            <TimeSection title="Due later" bucket={later} />
+          )}
 
-                const href = `/${row.assignment.assignmentId}?reviewee=${row.reviewee.userId}`;
-
-                return (
-                  <tr
-                    key={row.key}
-                    onClick={() => !row.done && router.push(href)}
-                    className={`animate-fade-up transition-colors ${
-                      row.done ? 'opacity-60' : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/60'
-                    }`}
-                    style={{ animationDelay: `${index * 30}ms` }}
-                  >
-                    <td className="py-3 pl-5 pr-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`h-9 w-9 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${avatarColor(row.reviewee.name)}`}
-                        >
-                          {initials(row.reviewee.name)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-white truncate">{row.reviewee.name}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate sm:hidden">
-                            {row.assignment.title}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-3 hidden sm:table-cell text-gray-500 dark:text-gray-400 truncate max-w-[14rem]">
-                      {row.assignment.title}
-                    </td>
-                    <td className="py-3 px-3 hidden md:table-cell text-gray-500 dark:text-gray-400">
-                      {formatDueDate(row.assignment.dueDate)}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full ${
-                        row.done
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                      }`}>
-                        {row.done ? 'Reviewed' : 'Needs review'}
-                      </span>
-                    </td>
-                    <td className="py-3 pl-3 pr-5 text-right">
-                      {row.done ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-600 inline-block" />
-                      ) : (
-                        <Link
-                          href={href}
-                          onClick={(e) => e.stopPropagation()}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 group"
-                        >
-                          Review
-                          <ChevronRightIcon className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Card>
+          {!isEmptyBucket(past) && (
+            <section className="space-y-4 animate-fade-up">
+              <button
+                type="button"
+                onClick={() => setShowPast((v) => !v)}
+                className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                {showPast ? (
+                  <ChevronDownIcon className="h-4 w-4" />
+                ) : (
+                  <ChevronRightIcon className="h-4 w-4" />
+                )}
+                Past ({past.reviewGroups.length + past.assignmentItems.length})
+              </button>
+              {showPast && <BucketContent bucket={past} animate={false} />}
+            </section>
+          )}
+        </>
       )}
+    </div>
+  );
+}
+
+function TimeSection({ title, bucket }: { title: string; bucket: Bucket }) {
+  return (
+    <section className="space-y-4 animate-fade-up">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        {title}
+      </h2>
+      <BucketContent bucket={bucket} />
+    </section>
+  );
+}
+
+function BucketContent({ bucket, animate = true }: { bucket: Bucket; animate?: boolean }) {
+  return (
+    <div className="space-y-6">
+      {bucket.reviewGroups.map((group) => (
+        <div key={group.assignment.assignmentId} className="space-y-2.5">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{group.assignment.title}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Due {formatDueDate(group.assignment.dueDate)} · {group.assignment.completedRevieweeIds.length} of{' '}
+              {group.assignment.requiredRevieweeIds.length} reviews completed
+            </p>
+          </div>
+          <SurveyTable rows={group.rows} animate={animate} />
+        </div>
+      ))}
+      {bucket.assignmentItems.map((item) => (
+        <AssignmentSummaryItem key={item.assignment.assignmentId} assignment={item.assignment} status={item.status} />
+      ))}
     </div>
   );
 }
