@@ -9,6 +9,16 @@ import { AuthBridge } from '@/lib/auth-bridge';
 import { deleteCookie, setCookie } from '@/lib/utils/cookies';
 import { AdminProfile } from '@/types/api';
 
+// Thrown by signIn() when the Cognito credentials are valid but the account
+// isn't an admin — callers should route to /not-authorized rather than
+// showing this as an inline form error.
+export class NotAdminError extends Error {
+  constructor() {
+    super('This app is only available to admins.');
+    this.name = 'NotAdminError';
+  }
+}
+
 interface AuthContextType {
   user: AdminProfile | null;
   isAuthenticated: boolean;
@@ -71,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (profile?.userType !== 'ADMIN') {
       await AuthBridge.signOutFromBridge();
-      throw new Error('This app is only available to admins.');
+      throw new NotAdminError();
     }
 
     setCookie('accessToken', 'COGNITO_MANAGED');

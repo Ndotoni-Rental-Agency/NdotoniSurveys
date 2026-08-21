@@ -26,7 +26,7 @@ export default function AuthCallbackPage() {
 
       const stillSignedIn = await AuthBridge.hasCognitoSession();
       if (!stillSignedIn) {
-        setError('This app is only available to admins.');
+        router.replace('/not-authorized');
       }
     };
 

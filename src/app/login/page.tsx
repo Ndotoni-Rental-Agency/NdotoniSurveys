@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, NotAdminError } from '@/contexts/AuthContext';
 import { getSafeErrorMessage } from '@/lib/error-utils';
 import { Card } from '@/components/ui/Card';
 
@@ -28,6 +28,10 @@ export default function LoginPage() {
       await signIn(email, password);
       router.push('/');
     } catch (err) {
+      if (err instanceof NotAdminError) {
+        router.push('/not-authorized');
+        return;
+      }
       setError(getSafeErrorMessage(err, 'signing in'));
     } finally {
       setLoading(false);
