@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { RatingScaleField } from './RatingScaleField';
 import {
-  SURVEY_RATING_CATEGORIES,
-  SurveyRating,
+  FEEDBACK_RATING_CATEGORIES,
+  FeedbackRating,
   TeamMemberOption,
 } from '@/types/survey';
 
-interface SurveyFormProps {
-  reviewee: TeamMemberOption;
+interface PeerFeedbackFormProps {
+  recipient: TeamMemberOption;
   isSubmitting: boolean;
   onSubmit: (input: {
-    ratings: SurveyRating[];
+    ratings: FeedbackRating[];
     strengths: string;
     improvements: string;
     additionalFeedback?: string;
@@ -26,7 +26,7 @@ interface SurveyFormProps {
 type TextField = 'strengths' | 'improvements' | 'additionalFeedback';
 
 type Step =
-  | { kind: 'rating'; category: (typeof SURVEY_RATING_CATEGORIES)[number] }
+  | { kind: 'rating'; category: (typeof FEEDBACK_RATING_CATEGORIES)[number] }
   | { kind: 'text'; field: TextField; title: string; helper: string; placeholder: string; required: boolean };
 
 const TEXT_STEPS: Extract<Step, { kind: 'text' }>[] = [
@@ -50,22 +50,22 @@ const TEXT_STEPS: Extract<Step, { kind: 'text' }>[] = [
     kind: 'text',
     field: 'additionalFeedback',
     title: 'Anything else to add?',
-    helper: 'Optional — any other feedback for this review.',
+    helper: 'Optional — any other feedback for this person.',
     placeholder: 'Optional comments...',
     required: false,
   },
 ];
 
 const STEPS: Step[] = [
-  ...SURVEY_RATING_CATEGORIES.map((category) => ({ kind: 'rating' as const, category })),
+  ...FEEDBACK_RATING_CATEGORIES.map((category) => ({ kind: 'rating' as const, category })),
   ...TEXT_STEPS,
 ];
 
-export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyFormProps) {
+export function PeerFeedbackForm({ recipient, isSubmitting, onSubmit, onBack }: PeerFeedbackFormProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const directionRef = useRef<1 | -1>(1);
   const [ratings, setRatings] = useState<Record<string, number | null>>(() =>
-    Object.fromEntries(SURVEY_RATING_CATEGORIES.map((category) => [category, null]))
+    Object.fromEntries(FEEDBACK_RATING_CATEGORIES.map((category) => [category, null]))
   );
   const [text, setText] = useState<Record<TextField, string>>({
     strengths: '',
@@ -93,7 +93,7 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
     }
 
     await onSubmit({
-      ratings: SURVEY_RATING_CATEGORIES.map((category) => ({
+      ratings: FEEDBACK_RATING_CATEGORIES.map((category) => ({
         category,
         score: ratings[category]!,
       })),
@@ -118,7 +118,7 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
         <ProgressBar
           current={stepIndex + 1}
           total={STEPS.length}
-          label={`Reviewing ${reviewee.name}`}
+          label={`Feedback for ${recipient.name}`}
         />
       </div>
 
@@ -134,7 +134,7 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
                 {step.category}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
-                How would you rate {reviewee.name} on this?
+                How would you rate {recipient.name} on this?
               </p>
             </div>
             <RatingScaleField
@@ -171,7 +171,7 @@ export function SurveyForm({ reviewee, isSubmitting, onSubmit, onBack }: SurveyF
           Back
         </Button>
         <Button type="button" onClick={goNext} disabled={!canAdvance} loading={isSubmitting}>
-          {isLastStep ? 'Submit Review' : 'Next'}
+          {isLastStep ? 'Submit Feedback' : 'Next'}
           {!isLastStep && <ArrowRightIcon className="h-4 w-4 ml-1.5" />}
         </Button>
       </div>

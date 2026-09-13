@@ -1,38 +1,17 @@
-export const listMySurveyAssignments = /* GraphQL */ `
-  query ListMySurveyAssignments($status: SurveyAssignmentStatus) {
-    listMySurveyAssignments(status: $status) {
-      assignments {
-        assignmentId
-        reviewerId
+export const listMySelfReports = /* GraphQL */ `
+  query ListMySelfReports($status: SelfReportStatus) {
+    listMySelfReports(status: $status) {
+      reports {
+        reportId
+        userId
         cycleMonth
         title
         status
-        requiredRevieweeIds
-        completedRevieweeIds
+        summary
+        blockers
         dueDate
         createdAt
         updatedAt
-      }
-      count
-    }
-  }
-`;
-
-export const getSurveyResponsesForReviewee = /* GraphQL */ `
-  query GetSurveyResponsesForReviewee($revieweeId: ID!) {
-    getSurveyResponsesForReviewee(revieweeId: $revieweeId) {
-      responses {
-        assignmentId
-        reviewerId
-        revieweeId
-        cycleMonth
-        ratings {
-          category
-          score
-        }
-        strengths
-        improvements
-        additionalFeedback
         submittedAt
       }
       count
@@ -40,36 +19,55 @@ export const getSurveyResponsesForReviewee = /* GraphQL */ `
   }
 `;
 
-export const getSurveyResponsesForAssignment = /* GraphQL */ `
-  query GetSurveyResponsesForAssignment($assignmentId: ID!) {
-    getSurveyResponsesForAssignment(assignmentId: $assignmentId) {
-      responses {
-        assignmentId
-        reviewerId
-        revieweeId
-        cycleMonth
-        ratings {
-          category
-          score
-        }
-        strengths
-        improvements
-        additionalFeedback
-        submittedAt
-      }
-      count
-    }
-  }
-`;
-
-export const getSurveyStats = /* GraphQL */ `
-  query GetSurveyStats($cycleMonth: String) {
-    getSurveyStats(cycleMonth: $cycleMonth) {
-      totalAssignments
-      completed
-      inProgress
+export const getSelfReportStats = /* GraphQL */ `
+  query GetSelfReportStats($cycleMonth: String) {
+    getSelfReportStats(cycleMonth: $cycleMonth) {
+      totalReports
+      submitted
       pending
       completionRate
+    }
+  }
+`;
+
+export const getFeedbackAboutUser = /* GraphQL */ `
+  query GetFeedbackAboutUser($userId: ID!) {
+    getFeedbackAboutUser(userId: $userId) {
+      feedback {
+        feedbackId
+        fromUserId
+        toUserId
+        ratings {
+          category
+          score
+        }
+        strengths
+        improvements
+        additionalFeedback
+        createdAt
+      }
+      count
+    }
+  }
+`;
+
+export const getFeedbackIGave = /* GraphQL */ `
+  query GetFeedbackIGave {
+    getFeedbackIGave {
+      feedback {
+        feedbackId
+        fromUserId
+        toUserId
+        ratings {
+          category
+          score
+        }
+        strengths
+        improvements
+        additionalFeedback
+        createdAt
+      }
+      count
     }
   }
 `;

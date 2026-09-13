@@ -1,60 +1,38 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { SurveyTable, ReviewRow, reviewRowRank } from '@/components/surveys/SurveyTable';
-import { AssignmentSummaryItem } from '@/components/surveys/AssignmentSummaryItem';
-import { useSurveys } from '@/hooks/useSurveys';
-import { useTeamMembers } from '@/hooks/useTeamMembers';
-import { AuthBridge } from '@/lib/auth-bridge';
-import { SurveyAssignment, TeamMemberOption, formatDueDate } from '@/types/survey';
+import { useEffect, useState } from 'react';
+import { ChevronDownIcon, ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { Card } from '@/components/ui/Card';
+import { SelfReportForm } from '@/components/surveys/SelfReportForm';
+import { useSelfReport } from '@/hooks/useSelfReport';
+import { useNotification } from '@/hooks/useNotification';
+import { NotificationModal } from '@/components/ui/NotificationModal';
+import { SelfReport, formatDueDate } from '@/types/survey';
 
-const DUE_SOON_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-type ReviewGroup = { assignment: SurveyAssignment; rows: ReviewRow[] };
-type AssignmentItem = { assignment: SurveyAssignment; status: 'FUTURE' | 'COMPLETED' };
-type Bucket = { reviewGroups: ReviewGroup[]; assignmentItems: AssignmentItem[] };
-
-function isEmptyBucket(bucket: Bucket) {
-  return bucket.reviewGroups.length === 0 && bucket.assignmentItems.length === 0;
+function currentCycleMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function SurveysDashboardPage() {
-  const { fetchMyAssignments } = useSurveys();
-  const { getUsersByIds } = useTeamMembers();
-  const [assignments, setAssignments] = useState<SurveyAssignment[]>([]);
-  const [revieweesByAssignment, setRevieweesByAssignment] = useState<Record<string, TeamMemberOption[]>>({});
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const { fetchMyReports, submitReport } = useSelfReport();
+  const { notification, showSuccess, showError, closeNotification } = useNotification();
+
+  const [reports, setReports] = useState<SelfReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPast, setShowPast] = useState(false);
-
-  useEffect(() => {
-    AuthBridge.getUserId().then(setCurrentUserId);
-  }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await fetchMyAssignments();
-      setAssignments(result.assignments);
-
-      // Resolve reviewees for every assignment with an actionable cycle so
-      // the table can list each person individually instead of collapsing
-      // the whole cycle into one row.
-      const now = new Date();
-      const currentCycle = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-      const needsReviewees = result.assignments.filter(
-        (item) => item.status !== 'COMPLETED' && item.cycleMonth <= currentCycle
-      );
-      const entries = await Promise.all(
-        needsReviewees.map(async (item) => [item.assignmentId, await getUsersByIds(item.requiredRevieweeIds)] as const)
-      );
-      setRevieweesByAssignment(Object.fromEntries(entries));
+      const result = await fetchMyReports();
+      setReports(result.reports);
     } catch (err) {
-      console.error('Failed to load surveys:', err);
-      setError('Failed to load surveys. Please try again.');
+      console.error('Failed to load self-reports:', err);
+      setError('Failed to load your updates. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,52 +42,25 @@ export default function SurveysDashboardPage() {
     loadData();
   }, []);
 
-  const { soon, later, past } = useMemo(() => {
-    const now = new Date();
-    const currentCycle = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const soonCutoff = now.getTime() + DUE_SOON_WINDOW_MS;
+  const cycle = currentCycleMonth();
+  const currentReport = reports.find((report) => report.cycleMonth === cycle);
+  const pastReports = reports
+    .filter((report) => report.cycleMonth !== cycle && report.status === 'SUBMITTED')
+    .sort((a, b) => (a.cycleMonth < b.cycleMonth ? 1 : -1));
 
-    const soonBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
-    const laterBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
-    const pastBucket: Bucket = { reviewGroups: [], assignmentItems: [] };
-
-    const bucketFor = (assignment: SurveyAssignment, isCompleted: boolean) => {
-      if (isCompleted) return pastBucket;
-      const due = new Date(assignment.dueDate ?? '').getTime();
-      return !Number.isNaN(due) && due <= soonCutoff ? soonBucket : laterBucket;
-    };
-
-    for (const assignment of assignments) {
-      const isFuture = assignment.status !== 'COMPLETED' && assignment.cycleMonth > currentCycle;
-      const isCompleted = assignment.status === 'COMPLETED';
-
-      if (isCompleted || isFuture) {
-        bucketFor(assignment, isCompleted).assignmentItems.push({
-          assignment,
-          status: isFuture ? 'FUTURE' : 'COMPLETED',
-        });
-        continue;
-      }
-
-      const reviewees = (revieweesByAssignment[assignment.assignmentId] ?? []).filter(
-        (member) => member.userId !== currentUserId
-      );
-      if (reviewees.length === 0) continue;
-
-      const rows: ReviewRow[] = reviewees
-        .map((reviewee) => ({
-          key: `${assignment.assignmentId}:${reviewee.userId}`,
-          assignment,
-          reviewee,
-          done: assignment.completedRevieweeIds.includes(reviewee.userId),
-        }))
-        .sort((a, b) => reviewRowRank(a) - reviewRowRank(b));
-
-      bucketFor(assignment, false).reviewGroups.push({ assignment, rows });
+  const handleSubmit = async (input: { summary: string; blockers?: string }) => {
+    try {
+      setIsSubmitting(true);
+      await submitReport({ cycleMonth: cycle, ...input });
+      showSuccess('Update submitted', 'Thanks for sharing what you worked on this month.');
+      await loadData();
+    } catch (err) {
+      console.error('Failed to submit self-report:', err);
+      showError('Submission failed', 'Could not submit your update. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    return { soon: soonBucket, later: laterBucket, past: pastBucket };
-  }, [assignments, revieweesByAssignment, currentUserId]);
+  };
 
   if (loading) {
     return (
@@ -119,14 +70,12 @@ export default function SurveysDashboardPage() {
     );
   }
 
-  const isEmpty = isEmptyBucket(soon) && isEmptyBucket(later) && isEmptyBucket(past);
-
   return (
-    <div className="space-y-10 max-w-3xl mx-auto">
+    <div className="space-y-10 max-w-2xl mx-auto">
       <div className="animate-fade-up">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Surveys</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Your Update</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
-          Complete your assigned peer-review surveys for the team.
+          Tell us what you worked on this month.
         </p>
       </div>
 
@@ -143,74 +92,72 @@ export default function SurveysDashboardPage() {
         </div>
       )}
 
-      {isEmpty ? (
-        <div className="animate-fade-up text-center py-16">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            No surveys assigned to you right now.
-          </p>
-        </div>
-      ) : (
-        <>
-          {!isEmptyBucket(soon) && (
-            <TimeSection title="Due soon" bucket={soon} />
-          )}
-
-          {!isEmptyBucket(later) && (
-            <TimeSection title="Due later" bucket={later} />
-          )}
-
-          {!isEmptyBucket(past) && (
-            <section className="space-y-4 animate-fade-up">
-              <button
-                type="button"
-                onClick={() => setShowPast((v) => !v)}
-                className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-              >
-                {showPast ? (
-                  <ChevronDownIcon className="h-4 w-4" />
-                ) : (
-                  <ChevronRightIcon className="h-4 w-4" />
-                )}
-                Past ({past.reviewGroups.length + past.assignmentItems.length})
-              </button>
-              {showPast && <BucketContent bucket={past} animate={false} />}
-            </section>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function TimeSection({ title, bucket }: { title: string; bucket: Bucket }) {
-  return (
-    <section className="space-y-4 animate-fade-up">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-        {title}
-      </h2>
-      <BucketContent bucket={bucket} />
-    </section>
-  );
-}
-
-function BucketContent({ bucket, animate = true }: { bucket: Bucket; animate?: boolean }) {
-  return (
-    <div className="space-y-6">
-      {bucket.reviewGroups.map((group) => (
-        <div key={group.assignment.assignmentId} className="space-y-2.5">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{group.assignment.title}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Due {formatDueDate(group.assignment.dueDate)} · {group.assignment.completedRevieweeIds.length} of{' '}
-              {group.assignment.requiredRevieweeIds.length} reviews completed
+      <Card padding="lg" className="animate-fade-up">
+        {currentReport?.status === 'SUBMITTED' ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+              <CheckCircleIcon className="h-6 w-6" />
+              <h2 className="text-xl font-bold tracking-tight">{currentReport.title}</h2>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Submitted {formatDueDate(currentReport.submittedAt)}
             </p>
+            <div className="space-y-3 pt-2">
+              <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                {currentReport.summary}
+              </p>
+              {currentReport.blockers && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-pre-wrap border-t border-gray-100 dark:border-gray-800 pt-3">
+                  {currentReport.blockers}
+                </p>
+              )}
+            </div>
           </div>
-          <SurveyTable rows={group.rows} animate={animate} />
-        </div>
-      ))}
-      {bucket.assignmentItems.map((item) => (
-        <AssignmentSummaryItem key={item.assignment.assignmentId} assignment={item.assignment} status={item.status} />
-      ))}
+        ) : (
+          <SelfReportForm
+            title={currentReport?.title ?? 'Monthly Update'}
+            isSubmitting={isSubmitting}
+            onSubmit={handleSubmit}
+          />
+        )}
+      </Card>
+
+      {pastReports.length > 0 && (
+        <section className="space-y-4 animate-fade-up">
+          <button
+            type="button"
+            onClick={() => setShowPast((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            {showPast ? (
+              <ChevronDownIcon className="h-4 w-4" />
+            ) : (
+              <ChevronRightIcon className="h-4 w-4" />
+            )}
+            Past updates ({pastReports.length})
+          </button>
+          {showPast && (
+            <div className="space-y-3">
+              {pastReports.map((report) => (
+                <Card key={report.reportId} padding="md">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{report.title}</h3>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1.5 whitespace-pre-wrap">
+                    {report.summary}
+                  </p>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={closeNotification}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
     </div>
   );
 }

@@ -1,41 +1,39 @@
-export const startSurveyAssignment = /* GraphQL */ `
-  mutation StartSurveyAssignment($assignmentId: ID!) {
-    startSurveyAssignment(assignmentId: $assignmentId) {
-      assignmentId
-      reviewerId
+export const submitSelfReport = /* GraphQL */ `
+  mutation SubmitSelfReport($cycleMonth: String, $summary: String!, $blockers: String) {
+    submitSelfReport(cycleMonth: $cycleMonth, summary: $summary, blockers: $blockers) {
+      reportId
+      userId
       cycleMonth
       title
       status
-      requiredRevieweeIds
-      completedRevieweeIds
+      summary
+      blockers
       dueDate
       createdAt
       updatedAt
+      submittedAt
     }
   }
 `;
 
-export const submitSurveyResponse = /* GraphQL */ `
-  mutation SubmitSurveyResponse(
-    $assignmentId: ID!
-    $revieweeId: ID!
-    $ratings: [SurveyRatingInput!]!
+export const giveFeedback = /* GraphQL */ `
+  mutation GiveFeedback(
+    $toUserId: ID!
+    $ratings: [FeedbackRatingInput!]!
     $strengths: String!
     $improvements: String!
     $additionalFeedback: String
   ) {
-    submitSurveyResponse(
-      assignmentId: $assignmentId
-      revieweeId: $revieweeId
+    giveFeedback(
+      toUserId: $toUserId
       ratings: $ratings
       strengths: $strengths
       improvements: $improvements
       additionalFeedback: $additionalFeedback
     ) {
-      assignmentId
-      reviewerId
-      revieweeId
-      cycleMonth
+      feedbackId
+      fromUserId
+      toUserId
       ratings {
         category
         score
@@ -43,7 +41,7 @@ export const submitSurveyResponse = /* GraphQL */ `
       strengths
       improvements
       additionalFeedback
-      submittedAt
+      createdAt
     }
   }
 `;

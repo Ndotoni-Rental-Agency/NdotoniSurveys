@@ -1,11 +1,10 @@
 'use client';
 
-import { ChevronRightIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import { TeamMemberOption } from '@/types/survey';
 
-interface RevieweePickerProps {
+interface TeammatePickerProps {
   members: TeamMemberOption[];
-  completedRevieweeIds: string[];
   onSelect: (member: TeamMemberOption) => void;
 }
 
@@ -28,21 +27,13 @@ function avatarColor(name: string) {
   return AVATAR_COLORS[hash];
 }
 
-export function RevieweePicker({
-  members,
-  completedRevieweeIds,
-  onSelect,
-}: RevieweePickerProps) {
-  const availableMembers = members.filter(
-    (member) => !completedRevieweeIds.includes(member.userId)
-  );
-
-  if (availableMembers.length === 0) {
+export function TeammatePicker({ members, onSelect }: TeammatePickerProps) {
+  if (members.length === 0) {
     return (
       <div className="animate-fade-up text-center py-16">
-        <CheckCircleIcon className="h-10 w-10 text-green-600 mx-auto mb-3" />
+        <UserGroupIcon className="h-10 w-10 text-gray-400 mx-auto mb-3" />
         <p className="text-sm text-gray-600 dark:text-gray-300">
-          You have completed reviews for all assigned team members.
+          No teammates to give feedback to right now.
         </p>
       </div>
     );
@@ -52,15 +43,15 @@ export function RevieweePicker({
     <div className="space-y-6">
       <div className="animate-fade-up">
         <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Who would you like to review?
+          Who would you like to give feedback to?
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Select a teammate to open their survey.
+          Optional — give a shoutout or constructive feedback to any teammate, anytime.
         </p>
       </div>
 
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
-        {availableMembers.map((member, index) => (
+        {members.map((member, index) => (
           <button
             key={member.userId}
             type="button"
